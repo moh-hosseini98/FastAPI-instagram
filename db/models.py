@@ -23,6 +23,17 @@ class DbPost(Base):
     timestamp = Column(DateTime)
     user_id = Column(Integer,ForeignKey("users.id"))
     user = relationship('DbUser',back_populates='items')
+    comments = relationship('DbComment',back_populates='post')
+
+class DbComment(Base):
+    __tablename__ = "comments"
+    
+    id = Column(Integer,primary_key=True,index=True)
+    text = Column(String)  
+    post_id = Column(Integer,ForeignKey("posts.id"))
+    timestamp = Column(DateTime)
+    username = Column(String)
+    post = relationship('DbPost',back_populates='comments')  
     
 
 
