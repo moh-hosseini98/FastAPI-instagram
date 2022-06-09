@@ -1,4 +1,4 @@
-from ast import mod
+
 from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException,status
@@ -87,7 +87,16 @@ class PostBase(BaseModel):
     image_url_type: str
     caption: str
     
+class CommentIn(BaseModel):
+    text: str
 
+
+class CommentDisplay(BaseModel):
+    text: str
+    username: str
+    class Config():
+        orm_mode = True
+ 
 class PostDisplay(BaseModel):
     id: int
     image_url: str
@@ -95,6 +104,7 @@ class PostDisplay(BaseModel):
     caption: str
     timestamp: datetime
     user: User
+    comments : List[CommentDisplay]
     class Config():
         orm_mode = True
 
@@ -103,8 +113,7 @@ class UserAuth(BaseModel):
     username: str
     email: str
 
-class CommentIn(BaseModel):
-    text: str
+
     
 
 
@@ -228,7 +237,8 @@ async def get_comments(post_id:int,request: CommentIn,user: dict = Depends(get_c
     new_comment = models.DbComment(
         text = request.text,
         post_id = post.id,
-        username = user.get("username")
+        username = user.get("username"),
+        timestamp = datetime.utcnow()
     )
 
     db.add(new_comment)
