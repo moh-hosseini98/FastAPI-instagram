@@ -2,6 +2,7 @@ from ast import mod
 from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException,status
+from requests import request
 from db.database import get_db
 from db import models
 from db.database import engine
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import jwt, JWTError
 
-SECRET_KEY = "7dDgecNgX1Zf7GLkOvpOB2dcVASDSOSDJKS1234367UIa"
+SECRET_KEY = "1F4D80A352ADBE20E70F71A45709718035784D587F63F43CD0C7765F0F4D90D7"
 ALGORITHM = "HS256"
 
 bcrypt_context = CryptContext(schemes=["bcrypt"],deprecated ="auto")
@@ -26,15 +27,15 @@ def verify_password(plain_password,hashed_password):
 
 
 def create_access_token(username: str,user_id: int,expire_delta: Optional[timedelta] = None):
-    encode = {"sub":username,"id":user_id}
+    to_encode = {"sub":username,"id":user_id}
     if expire_delta:
         expire = datetime.utcnow() + expire_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)   
 
-    encode.update({"exp":expire}) 
+    to_encode.update({"exp":expire}) 
 
-    return jwt.encode(encode,SECRET_KEY,algorithm=ALGORITHM)
+    return jwt.encode(to_encode,SECRET_KEY,algorithm=ALGORITHM)
 
 
 
@@ -47,13 +48,13 @@ def get_current_user(token: str = Depends(oath2_bearer)):
     )
 
     try:
-        payload = jwt.decode(token,SECRET_KEY,algorithms=ALGORITHM)
+        payload = jwt.decode(token,SECRET_KEY,algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         user_id: str = payload.get("id")
         if username is None or user_id is None:
             raise credentials_exception
 
-        return {"usernmae":username,"id":user_id}    
+        return {"username":username,"id":user_id}    
     except JWTError:
         raise  credentials_exception  
 
@@ -102,7 +103,9 @@ class UserAuth(BaseModel):
     username: str
     email: str
 
-
+class CommentIn(BaseModel):
+    text: str
+    
 
 
 
@@ -210,9 +213,29 @@ async def delete_post(post_id: int,user: dict = Depends(get_current_user),db: Se
 
 @app.get("/me")
 async def user_posts(user: dict = Depends(get_current_user),db: Session = Depends(get_db)):
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_FORBIDDEN,detail="Credentials not valid",
+        headers={"www-Authenticate": "Bearer"})
     posts = db.query(models.DbPost).filter(models.DbPost.user_id == user.get("id")).all()
     return posts
 
+@app.post("/posts/{post_id}/comments")
+async def get_comments(post_id:int,request: CommentIn,user: dict = Depends(get_current_user),db: Session = Depends(get_db)):
+    post = db.query(models.DbPost).filter(models.DbPost.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail='not found')
+
+    new_comment = models.DbComment(
+        text = request.text,
+        post_id = post.id,
+        username = user.get("username")
+    )
+
+    db.add(new_comment)
+    db.commit()
+    db.refresh(new_comment)
+
+    return new_comment
 
 
 
